@@ -1,0 +1,42 @@
+Platzieren Sie einen Breakpoint auf der Funktion mistake1 , starten Sie das
+Programm, geben Sie den Wert von buf und buf[2] aus. Gehen Sie zur
+nächsten Zeile und geben Sie beide Werte wieder aus. Von welchem Typ ist
+buf ?
+
+(gdb) print buf
+$1 = {194, 0, -6826, 32767, 1, 0}
+(gdb) print buf[2]
+$2 = -6826
+
+
+(gdb) print buf
+$4 = {1, 1, 2, 3, 4, 5}
+(gdb) print buf[2]
+$5 = 2
+
+(gdb) ptype buf
+type = int [6]
+
+Platzieren Sie einen Breakpoint in der Funktion mistake2 , setzen Sie den
+Programmlauf fort. Welchen Typ hat buf ?
+
+(gdb) ptype buf
+type = int *
+
+
+– Setzen Sie den Programmlauf fort, welcher Text wird nun ausgegeben? Lassen
+Sie sich den Code um diese Stelle herum ausgeben. Welche Frames sind auf
+dem Stack? Wechseln Sie zu Frame 1. Geben Sie den Inhalt von p aus.
+
+
+(gdb) bt
+#0  0x0000555555555209 in mistake3 () at simple.c:30
+#1  0x0000555555555290 in main () at simple.c:47
+
+(gdb) print p
+$2 = {0x4, 0x555555559264, 0x555555555330 <__libc_csu_init>, 0x555555555070 <_start>}
+
+
+
+
+
