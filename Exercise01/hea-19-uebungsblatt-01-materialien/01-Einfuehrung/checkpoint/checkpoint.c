@@ -14,7 +14,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define N 10
+#define N 360
 
 /* time measurement variables */
 struct timeval start_time;       /* time when program started               */
@@ -169,8 +169,6 @@ calculate (double** matrix, int iterations, int threads)
 	omp_set_dynamic(0);
 	omp_set_num_threads(threads);
 
-    //TODO: messung verschieben, so wird ganze berechnung mitgemessen
-    gettimeofday(&start_time_iops, NULL);
 	#pragma omp parallel firstprivate(tid, lines, from, to) private(k, l, i, j)
 	{
 		tid = omp_get_thread_num();
@@ -178,8 +176,6 @@ calculate (double** matrix, int iterations, int threads)
 		lines = (tid < (N % threads)) ? ((N / threads) + 1) : (N / threads);
 		from =  (tid < (N % threads)) ? (lines * tid) : ((lines * tid) + (N % threads));
 		to = from + lines;
-
-		printf("%d %d %d %d\n",tid,lines,from,to);
 
 		for (k = 1; k <= iterations; k++)
 		{
@@ -190,10 +186,10 @@ calculate (double** matrix, int iterations, int threads)
 					for (l = 1; l <= 4; l++)
 					{
 					    //nur für testzwecke
-					    matrix[i][j] = tid;
+					    //matrix[i][j] = tid;
 
 					    //eigentliche berechnung
-						//matrix[i][j] = cos(matrix[i][j]) * sin(matrix[i][j]) * sqrt(matrix[i][j]) / tan(matrix[i][j]) / log(matrix[i][j]) * k * l;
+						matrix[i][j] = cos(matrix[i][j]) * sin(matrix[i][j]) * sqrt(matrix[i][j]) / tan(matrix[i][j]) / log(matrix[i][j]) * k * l;
 					}
 				}
 
@@ -201,18 +197,27 @@ calculate (double** matrix, int iterations, int threads)
 
             //pwrite(int fd, const void *buf, size_t count, off_t offset)
             //fd filedesc, buf data to write, count size of data, offset offset in file
-            for (i = from; i < to;++i)
+
+            #pragma omp single nowait
             {
-                pwrite(fd,(void*)matrix[i],N * sizeof(double),N * i * sizeof(double));
+                gettimeofday(&start_time_iops, NULL);
             }
 
 
+            for (i = from; i < to;++i)
+            {
+                pwrite(fd, (void *) matrix[i], N * sizeof(double), N * i * sizeof(double));
+            }
 
 			#pragma omp barrier
+            #pragma omp single
+            {
+                gettimeofday(&end_time_iops, NULL);
+            }
 		}
 	}
 
-    gettimeofday(&end_time_iops, NULL);
+
 
 	cl = close(fd);
 
@@ -295,14 +300,14 @@ main (int argc, char** argv)
 		init_matrix(matrix);
 	}
 
-	show_matrix(matrix);
+	//show_matrix(matrix);
 
 	gettimeofday(&start_time, NULL);
 	calculate(matrix, iterations, threads);
 	gettimeofday(&comp_time, NULL);
 
-	printf("After calculation\n");
-	show_matrix(matrix);
+	//printf("After calculation\n");
+	//show_matrix(matrix);
 
 	displayStatistics();
 
