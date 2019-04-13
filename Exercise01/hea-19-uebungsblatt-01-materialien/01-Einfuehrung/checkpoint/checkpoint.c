@@ -13,8 +13,15 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <string.h>
 
+#define DEBUG 0
+
+#if DEBUG
 #define N 10
+#else
+#define N 360
+#endif
 
 /* time measurement variables */
 struct timeval start_time;       /* time when program started               */
@@ -97,9 +104,11 @@ init_matrix (double** matrix)
 
 
 /* ************************************************************************* */
-/*  init matrix									                             */
+/*  show matrix									                             */
 /* ************************************************************************* */
-static void
+#if DEBUG
+static
+void
 show_matrix(double** matrix)
 {
    //for debugging purpose only
@@ -115,7 +124,7 @@ show_matrix(double** matrix)
        printf("\n");
    }
 }
-
+#endif
 /* ************************************************************************* */
 /*  init matrix reading file					         	                             */
 /* ************************************************************************* */
@@ -279,7 +288,9 @@ void
 displayStatistics (void)
 {
 	double time = (comp_time.tv_sec - start_time.tv_sec) + (comp_time.tv_usec - start_time.tv_usec) * 1e-6;
-	double time_iops = (end_time_iops.tv_sec - start_time_iops.tv_sec) + (end_time_iops.tv_usec - start_time_iops.tv_usec) * 1e-6;
+	double time_iops =  (end_time_iops.tv_sec - start_time_iops.tv_sec)
+	                    + (end_time_iops.tv_usec - start_time_iops.tv_usec)
+	                    * 1e-6;
 	double iops_per_sec = N*N / time_iops;
 	double mb_per_sec = N*N*sizeof(double) * 1e-6 / time_iops;
 	printf("Berechnungszeit: %fs\n", time);
@@ -316,10 +327,14 @@ main (int argc, char** argv)
 {
 	int threads, iterations;
 	char filepath[256] = "";
+	char standardpath[256] = "matrix.out";
 	double** matrix;
 	int file_exists; //1 if exists, 0 otherwise
 
-
+#if DEBUG
+    printf("DEBUG RUN\n");
+    printf("Matrix will only be %dx%d\n",N,N);
+#endif
 
 	if (argc < 3)
 	{
@@ -330,6 +345,8 @@ main (int argc, char** argv)
 	{
 		sscanf(argv[1], "%d", &threads);
 		sscanf(argv[2], "%d", &iterations);
+		//use standardpath matrix.out in same directory if no argument was given
+        strncpy(filepath,standardpath,256);
 	}
 	else if(argc == 4)
     {
@@ -355,14 +372,19 @@ main (int argc, char** argv)
 		init_matrix(matrix);
 	}
 
+#if DEBUG
+	printf("After reading\n");
 	show_matrix(matrix);
+#endif
 
 	gettimeofday(&start_time, NULL);
 	calculate(matrix, iterations, threads,filepath);
 	gettimeofday(&comp_time, NULL);
 
-	//printf("After calculation\n");
-	//show_matrix(matrix);
+#if DEBUG
+	printf("After calculation\n");
+	show_matrix(matrix);
+#endif
 
 	displayStatistics();
 
