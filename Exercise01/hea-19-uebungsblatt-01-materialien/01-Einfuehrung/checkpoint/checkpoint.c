@@ -14,7 +14,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define N 360
+#define N 10
 
 /* time measurement variables */
 struct timeval start_time;       /* time when program started               */
@@ -121,15 +121,42 @@ show_matrix(double** matrix)
 /* ************************************************************************* */
 static
 void
-read_matrix (double** matrix)
+read_matrix (double** matrix,char* filepath)
 {
 
     int fd, cl;
     int i;
+    //header
+    int t_1,i_1,i_c;
 
 	(void)matrix;
 
-	fd = open("matrix.out", O_RDWR);
+	fd = open(filepath, O_RDWR);
+
+	//read header
+    read(fd,&t_1,sizeof(int));
+    read(fd,&i_1,sizeof(int));
+    read(fd,&i_c,sizeof(int));
+
+    //handle cases listed in exercise
+
+    // t1 != t2, does this matter?
+
+    // i_c < i_1 : first run was interrupted somehow
+    //TODO, if atomic writing: do nothing, start from iteration i_c until i_2
+    // if no atomic writing: data may be corrupted
+
+    // i_c == i_1 & i_c > i_2: first run completed, and..? does this matter?
+
+
+    // i_c == i_1 & i_1 < i_2: first run completed, second run longer than first one? does this matter?
+
+
+
+    printf("%d %d %d\n",t_1,i_1,i_c);
+
+
+	//read matrix values, here sequential, use pread and a more non sequential approach
 
 	for(i = 0; i < N;++i)
     {
@@ -150,17 +177,24 @@ read_matrix (double** matrix)
 /* ************************************************************************ */
 static
 void
-calculate (double** matrix, int iterations, int threads)
+calculate (double** matrix, int iterations, int threads,char *filepath)
 {
 	int i, j, k, l;
 	int tid;
 	int lines, from, to;
 	int fd;
 	int cl;
+	int last_iteration_written;
 
 	//opens file matrix out,
 	//if it does not exist, it will be created with read write  rights for user
-	fd = open("matrix.out", O_RDWR | O_CREAT, 00777);
+	last_iteration_written = 0;
+	fd = open(filepath, O_RDWR | O_CREAT, 00777);
+
+	//write header, size 3 * int, order: threads, iteration, last iteration written
+    pwrite(fd,(void*)&threads,sizeof(int),0);
+    pwrite(fd,(void*)&iterations,sizeof(int),sizeof(int));
+    pwrite(fd,(void*)&last_iteration_written,sizeof(int),2 * sizeof(int));
 
 	tid = 0;
 	lines = from = to = -1;
@@ -185,11 +219,11 @@ calculate (double** matrix, int iterations, int threads)
 				{
 					for (l = 1; l <= 4; l++)
 					{
-					    //nur für testzwecke
-					    //matrix[i][j] = tid;
+					    //only for debugging
+					    matrix[i][j] = tid;
 
-					    //eigentliche berechnung
-						matrix[i][j] = cos(matrix[i][j]) * sin(matrix[i][j]) * sqrt(matrix[i][j]) / tan(matrix[i][j]) / log(matrix[i][j]) * k * l;
+					    //actual calculaton
+						//matrix[i][j] = cos(matrix[i][j]) * sin(matrix[i][j]) * sqrt(matrix[i][j]) / tan(matrix[i][j]) / log(matrix[i][j]) * k * l;
 					}
 				}
 
@@ -198,6 +232,9 @@ calculate (double** matrix, int iterations, int threads)
             //pwrite(int fd, const void *buf, size_t count, off_t offset)
             //fd filedesc, buf data to write, count size of data, offset offset in file
 
+
+            //first thread to reach this will execute, only this thread: single
+            //other will not wait: nowait
             #pragma omp single nowait
             {
                 gettimeofday(&start_time_iops, NULL);
@@ -206,13 +243,20 @@ calculate (double** matrix, int iterations, int threads)
 
             for (i = from; i < to;++i)
             {
-                pwrite(fd, (void *) matrix[i], N * sizeof(double), N * i * sizeof(double));
+                //+ 3 sizeof * int because of header
+                pwrite(fd, (void *) matrix[i], N * sizeof(double), N * i * sizeof(double) + 3 * sizeof(int));
             }
 
+            //synchronize threads after writing
 			#pragma omp barrier
+
+			//measure time after all have finished and write last iteration to header
+			//omp single introduces implicit barrier, doesnt matter?
             #pragma omp single
             {
                 gettimeofday(&end_time_iops, NULL);
+                //write last iteration
+                pwrite(fd,(void*)&k,sizeof(int),2*sizeof(int));
             }
 		}
 	}
@@ -271,39 +315,50 @@ int
 main (int argc, char** argv)
 {
 	int threads, iterations;
+	char filepath[256] = "";
 	double** matrix;
 	int file_exists; //1 if exists, 0 otherwise
 
+
+
 	if (argc < 3)
 	{
-		printf("Usage: %s threads iterations\n", argv[0]);
+		printf("Usage: %s threads iterations OPTIONAL file\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
-	else
+	else if(argc == 3)
 	{
 		sscanf(argv[1], "%d", &threads);
 		sscanf(argv[2], "%d", &iterations);
 	}
+	else if(argc == 4)
+    {
+        sscanf(argv[1], "%d", &threads);
+        sscanf(argv[2], "%d", &iterations);
+        sscanf(argv[3], "%s", filepath);
+    }
 
 	matrix = alloc_matrix();
 
 	//check if file exists
 
-    file_exists = cfileexists("matrix.out");
+    file_exists = cfileexists(filepath);
 
 	if (file_exists)
 	{
-		read_matrix(matrix);
+	    printf("file does exist: %s\n",filepath);
+		read_matrix(matrix,filepath);
 	}
 	else
 	{
+        printf("file does not exist: %s\n",filepath);
 		init_matrix(matrix);
 	}
 
-	//show_matrix(matrix);
+	show_matrix(matrix);
 
 	gettimeofday(&start_time, NULL);
-	calculate(matrix, iterations, threads);
+	calculate(matrix, iterations, threads,filepath);
 	gettimeofday(&comp_time, NULL);
 
 	//printf("After calculation\n");
