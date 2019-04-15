@@ -15,7 +15,7 @@
 #include <sys/types.h>
 #include <string.h>
 
-#define DEBUG 0
+#define DEBUG 1
 
 #if DEBUG
 #define N 10
@@ -130,22 +130,26 @@ show_matrix(double** matrix)
 /* ************************************************************************* */
 static
 void
-read_matrix (double** matrix,char* filepath)
+read_matrix (double** matrix,char* filepath,int *t_1, int *i_1, int *i_c)
 {
 
     int fd, cl;
     int i;
-    //header
-    int t_1,i_1,i_c;
+    int ping;
+    int size;
+    
 
 	(void)matrix;
 
 	fd = open(filepath, O_RDWR);
 
 	//read header
-    read(fd,&t_1,sizeof(int));
-    read(fd,&i_1,sizeof(int));
-    read(fd,&i_c,sizeof(int));
+    pread(fd,t_1,sizeof(int),0);
+    pread(fd,i_1,sizeof(int),sizeof(int));
+    pread(fd,i_c,sizeof(int),2*sizeof(int));
+
+    ping = (*i_c - 1) % 2;
+    size = N*N*sizeof(double);
 
     //handle cases listed in exercise
 
@@ -161,15 +165,15 @@ read_matrix (double** matrix,char* filepath)
     // i_c == i_1 & i_1 < i_2: first run completed, second run longer than first one? does this matter?
 
 
-
-    printf("%d %d %d\n",t_1,i_1,i_c);
-
+#if DEBUG
+    printf("%d %d %d\n",*t_1,*i_1,*i_c);
+#endif //DEBUG
 
 	//read matrix values, here sequential, use pread and a more non sequential approach
 
 	for(i = 0; i < N;++i)
     {
-            read(fd, matrix[i], N*sizeof(double));
+            pread(fd, matrix[i], N*sizeof(double),i * N * sizeof(double) + ping * size + 3 * sizeof(int));
     }
 
 	cl = close(fd);
@@ -186,7 +190,7 @@ read_matrix (double** matrix,char* filepath)
 /* ************************************************************************ */
 static
 void
-calculate (double** matrix, int iterations, int threads,char *filepath)
+calculate (double** matrix, int iterations, int threads,char *filepath,int *t_1, int *i_1, int *i_c)
 {
 	int i, j, k, l;
 	int tid;
@@ -194,6 +198,14 @@ calculate (double** matrix, int iterations, int threads,char *filepath)
 	int fd;
 	int cl;
 	int last_iteration_written;
+
+	//for atomic writing
+	int ping;
+	int size;
+	int headersize;
+
+	headersize = 3 * sizeof(int);
+	size  = (N * N * sizeof(double));
 
 	//opens file matrix out,
 	//if it does not exist, it will be created with read write  rights for user
@@ -222,6 +234,10 @@ calculate (double** matrix, int iterations, int threads,char *filepath)
 
 		for (k = 1; k <= iterations; k++)
 		{
+#pragma omp single nowait
+            {
+                ping = (k-1) % 2;
+		    }
 			for (i = from; i < to; i++)
 			{
 				for (j = 0; j < N; j++)
@@ -229,10 +245,12 @@ calculate (double** matrix, int iterations, int threads,char *filepath)
 					for (l = 1; l <= 4; l++)
 					{
 					    //only for debugging
+#if DEBUG
 					    matrix[i][j] = tid;
-
-					    //actual calculaton
-						//matrix[i][j] = cos(matrix[i][j]) * sin(matrix[i][j]) * sqrt(matrix[i][j]) / tan(matrix[i][j]) / log(matrix[i][j]) * k * l;
+#else
+					    //actual calculation
+						matrix[i][j] = cos(matrix[i][j]) * sin(matrix[i][j]) * sqrt(matrix[i][j]) / tan(matrix[i][j]) / log(matrix[i][j]) * k * l;
+#endif
 					}
 				}
 
@@ -253,7 +271,7 @@ calculate (double** matrix, int iterations, int threads,char *filepath)
             for (i = from; i < to;++i)
             {
                 //+ 3 sizeof * int because of header
-                pwrite(fd, (void *) matrix[i], N * sizeof(double), N * i * sizeof(double) + 3 * sizeof(int));
+                pwrite(fd, (void *) matrix[i], N * sizeof(double), N * i * sizeof(double) + headersize + ping * size);
             }
 
             //synchronize threads after writing
@@ -288,6 +306,8 @@ void
 displayStatistics (void)
 {
 	double time = (comp_time.tv_sec - start_time.tv_sec) + (comp_time.tv_usec - start_time.tv_usec) * 1e-6;
+
+	//TODO: I do not know, if this calculation is correct?
 	double time_iops =  (end_time_iops.tv_sec - start_time_iops.tv_sec)
 	                    + (end_time_iops.tv_usec - start_time_iops.tv_usec)
 	                    * 1e-6;
@@ -330,6 +350,7 @@ main (int argc, char** argv)
 	char standardpath[256] = "matrix.out";
 	double** matrix;
 	int file_exists; //1 if exists, 0 otherwise
+	int t_1,i_1,i_c;
 
 #if DEBUG
     printf("DEBUG RUN\n");
@@ -364,12 +385,15 @@ main (int argc, char** argv)
 	if (file_exists)
 	{
 	    printf("file does exist: %s\n",filepath);
-		read_matrix(matrix,filepath);
+		read_matrix(matrix,filepath,&t_1,&i_1,&i_c);
 	}
 	else
 	{
         printf("file does not exist: %s\n",filepath);
 		init_matrix(matrix);
+		t_1 = threads;
+		i_1 = iterations;
+		i_c = 0;
 	}
 
 #if DEBUG
@@ -378,7 +402,7 @@ main (int argc, char** argv)
 #endif
 
 	gettimeofday(&start_time, NULL);
-	calculate(matrix, iterations, threads,filepath);
+	calculate(matrix, iterations, threads,filepath,&t_1,&i_1,&i_c);
 	gettimeofday(&comp_time, NULL);
 
 #if DEBUG
