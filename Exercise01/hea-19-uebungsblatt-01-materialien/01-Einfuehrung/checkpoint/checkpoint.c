@@ -311,7 +311,7 @@ displayStatistics (void)
 	double time_iops =  (end_time_iops.tv_sec - start_time_iops.tv_sec)
 	                    + (end_time_iops.tv_usec - start_time_iops.tv_usec)
 	                    * 1e-6;
-	double iops_per_sec = N*N / time_iops;
+	double iops_per_sec = N / time_iops;
 	double mb_per_sec = N*N*sizeof(double) * 1e-6 / time_iops;
 	printf("Berechnungszeit: %fs\n", time);
 
