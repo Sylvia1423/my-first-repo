@@ -10,6 +10,10 @@ int *
 mistake1 ()
 {
   int *buf = malloc(sizeof(int) * 6);
+  if(NULL == buf)
+  {
+    exit(1);
+  }
   buf[0] = 1;
   buf[1] = 1;
   buf[2] = 2;
@@ -23,6 +27,10 @@ int *
 mistake2 ()
 {
   int *buf = malloc (sizeof (int) * 4);
+  if(NULL == buf)
+  {
+    exit(1);
+  }
   buf[1] = 2;
   return buf;
 }
@@ -33,6 +41,8 @@ mistake3 ()
   /* In dieser Funktion darf kein Speicher direkt allokiert werden. */
   int *buf = &mistake2()[0];
   buf[0] = 3;
+  //int *buf = mistake2();//
+  //*buf = 3;//
   return buf;
 }
 
@@ -40,6 +50,10 @@ int *
 mistake4 ()
 {
   int *buf = malloc (sizeof (int) * 4);
+  if(NULL == buf)
+  {
+    exit(1);
+  }
   buf[0] = 4;
   return buf;
 }
