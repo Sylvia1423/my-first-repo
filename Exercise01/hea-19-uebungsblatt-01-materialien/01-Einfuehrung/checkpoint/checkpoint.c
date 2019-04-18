@@ -130,6 +130,8 @@ show_matrix(double** matrix)
 /* ************************************************************************* */
 static
 void
+//add t_2, i_2 //
+//read_matrix (double** matrix,char* filepath,int *t_1, int *i_1, int *i_c, int t_2, int i_2)
 read_matrix (double** matrix,char* filepath,int *t_1, int *i_1, int *i_c)
 {
 
@@ -140,9 +142,8 @@ read_matrix (double** matrix,char* filepath,int *t_1, int *i_1, int *i_c)
     
 
 	(void)matrix;
-
+    
 	fd = open(filepath, O_RDWR);
-
 	//read header
     pread(fd,t_1,sizeof(int),0);
     pread(fd,i_1,sizeof(int),sizeof(int));
@@ -154,16 +155,28 @@ read_matrix (double** matrix,char* filepath,int *t_1, int *i_1, int *i_c)
     //handle cases listed in exercise
 
     // t1 != t2, does this matter?
+	//Maybe we can ignore the 1. case
 
     // i_c < i_1 : first run was interrupted somehow
     //TODO, if atomic writing: do nothing, start from iteration i_c until i_2
+	if(i_c < i_1)
+	{
+		i_1 = i_c;
+	}
     // if no atomic writing: data may be corrupted
 
     // i_c == i_1 & i_c > i_2: first run completed, and..? does this matter?
-
+	//i_c > i_2, won't need to calculate again?
+    if(i_c == i_1 && i_c > i_2)
+	{
+		i_2 = i_1;
+	}
 
     // i_c == i_1 & i_1 < i_2: first run completed, second run longer than first one? does this matter?
-
+//   if(i_C == i_1 && i_1 < i_2)
+//	{
+//      init_matrix
+//	}
 
 #if DEBUG
     printf("%d %d %d\n",*t_1,*i_1,*i_c);
@@ -231,7 +244,7 @@ calculate (double** matrix, int iterations, int threads,char *filepath,int *t_1,
 		lines = (tid < (N % threads)) ? ((N / threads) + 1) : (N / threads);
 		from =  (tid < (N % threads)) ? (lines * tid) : ((lines * tid) + (N % threads));
 		to = from + lines;
-
+      //for (k = i_1; k <= iterations; k++)
 		for (k = 1; k <= iterations; k++)
 		{
 #pragma omp single nowait
@@ -385,7 +398,9 @@ main (int argc, char** argv)
 	if (file_exists)
 	{
 	    printf("file does exist: %s\n",filepath);
-		read_matrix(matrix,filepath,&t_1,&i_1,&i_c);
+		t_2 =threads;
+		i_2 =iterations;
+		read_matrix(matrix,filepath,&t_1,&i_1,&i_c);	
 	}
 	else
 	{
