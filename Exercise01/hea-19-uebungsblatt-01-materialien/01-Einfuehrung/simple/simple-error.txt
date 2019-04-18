@@ -1,7 +1,7 @@
 Platzieren Sie einen Breakpoint auf der Funktion mistake1 , starten Sie das
 Programm, geben Sie den Wert von buf und buf[2] aus. Gehen Sie zur
 nächsten Zeile und geben Sie beide Werte wieder aus. Von welchem Typ ist
-buf ?
+buf?
 
 (gdb) print buf
 $1 = {194, 0, -6826, 32767, 1, 0}
@@ -17,11 +17,15 @@ $5 = 2
 (gdb) ptype buf
 type = int [6]
 
+buf is an array of pointers.
+
 Platzieren Sie einen Breakpoint in der Funktion mistake2 , setzen Sie den
 Programmlauf fort. Welchen Typ hat buf ?
 
 (gdb) ptype buf
 type = int *
+
+buf is a pointer.
 
 
 – Setzen Sie den Programmlauf fort, welcher Text wird nun ausgegeben? Lassen
