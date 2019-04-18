@@ -1,0 +1,11 @@
+4.1
+The calculation of IOPS is based on three key factors, which are rotational speed, average latency and average seek time。
+The necessary time for I/O is only the transfer time and it ignores the seek time. But seek time is very important for random read and write.
+
+4.2
+T1 and T2 are different, which means process L1 run with T1 threads and process L2 run with T2 threads, it might cause different speed between the process, but the same result as T1 = T2?
+i_c < i_1, then the process L1 stop at i_c, process_2 start with i_c+1
+i_c = i_1 & i_c > i_2, process L1 is finished, and process L2 is part of L1, not necessary to run L2 again
+i_c = i_1 & i_1 < i_2, process L1 is finished, and process L2 starts with i_1+1
+
+4.3
