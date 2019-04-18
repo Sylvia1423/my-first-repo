@@ -130,7 +130,6 @@ show_matrix(double** matrix)
 /* ************************************************************************* */
 static
 void
-//add t_2, i_2 //
 //read_matrix (double** matrix,char* filepath,int *t_1, int *i_1, int *i_c, int t_2, int i_2)
 read_matrix (double** matrix,char* filepath,int *t_1, int *i_1, int *i_c)
 {
@@ -159,18 +158,12 @@ read_matrix (double** matrix,char* filepath,int *t_1, int *i_1, int *i_c)
 
     // i_c < i_1 : first run was interrupted somehow
     //TODO, if atomic writing: do nothing, start from iteration i_c until i_2
-	if(i_c < i_1)
-	{
-		i_1 = i_c;
-	}
+
     // if no atomic writing: data may be corrupted
 
     // i_c == i_1 & i_c > i_2: first run completed, and..? does this matter?
 	//i_c > i_2, won't need to calculate again?
-    if(i_c == i_1 && i_c > i_2)
-	{
-		i_2 = i_1;
-	}
+    
 
     // i_c == i_1 & i_1 < i_2: first run completed, second run longer than first one? does this matter?
 //   if(i_C == i_1 && i_1 < i_2)
@@ -400,7 +393,15 @@ main (int argc, char** argv)
 	    printf("file does exist: %s\n",filepath);
 		t_2 =threads;
 		i_2 =iterations;
-		read_matrix(matrix,filepath,&t_1,&i_1,&i_c);	
+		read_matrix(matrix,filepath,&t_1,&i_1,&i_c);
+		if(i_c < i_1)
+	    {
+		  i_1 = i_c;
+	    }	
+		if(i_c == i_1 && i_c > i_2)
+	    {
+		  i_2 = i_1;
+	    }
 	}
 	else
 	{
