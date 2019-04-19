@@ -1,7 +1,8 @@
 4.1
 We choose pwrite().
-As only one thread can write at a time with write(), it might take long time to queue and the output frames will be in mess.
-It’s like write() but has an offset parameter. Unlike lseek() followed by a write(), multiple threads and processes can, in parallel, safely write to the same file descriptor at different file offsets. The catch is that the output must be a file, not a pipe.
+As only one thread can write at a time with write(), it might take long time to queue and the output frames will be in mess.If write() is interrupted by a signal before it writes any data, it returns -1 with errno set to EINTR. 
+If write() is interrupted by a signal after it successfully writes some data, it returns the number of bytes written.
+pwrite() is like write() but has an offset parameter. Unlike lseek() followed by a write(), multiple threads and processes can, in parallel, safely write to the same file descriptor at different file offsets. The catch is that the output must be a file, not a pipe.
 
 The calculation of IOPS is based on three key factors, which are rotational speed, average latency and average seek time。
 The necessary time for I/O is only the transfer time and it ignores the seek time. But seek time is very important for random read and write.
