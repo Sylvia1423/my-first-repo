@@ -1,0 +1,32 @@
+4.1
+write: schreibt fortlaufend die gewünschte anzahl bytes an den zeiger im file descriptor. 
+dieser wird immer um die anzahl bytes weitergeschoben und an der neuen stelle geschrieben
+pwrite: hier wird zusätzlich ein offset angegeben, wodurch es möglich ist mit mehreren threads
+in die gleiche datei zu schreiben
+
+Für das Schreiben haben wir uns für pwrite entschieden, damit wir mit den Threads gleichzeitig 
+schreiben können, was so mit dem normalen write nicht möglich wäre
+
+Unsere Berechnung messen wir einmal, wenn der erste Thread anfängt zu schreiben (erster zeitlich gemeint). 
+Das wird durch #pragma omp single nowait realisiert. 
+Nach der omp Barrier schreiben wir nochmal, Diesmal ohne "nowait", damit alle Threads die nächste
+Iteration zeitgleich anfangen.
+
+4.2.
+
+Wir haben die Fehler wie folgt behandelt.
+1. Ungleiche Threadzahl: Zur Zeit geben wir nur aus, dass es nicht die gleiche Threadzahl war, da es
+für dieses Programm noch keine Rolle spielt. Sollte in einem späteren Programm sich dadurch die Berechnung
+ändern, werden wir das genauer betrachten.
+Für die anderen Fälle haben wir nicht groß eine Fehlerbetrachtung gemacht, da wir es uns so dachten:
+Durch atomares Schreiben haben wir immer einen konsistensten Zustand unserer Daten. Wenn I_2 angegeben wird,
+ist das eine zusätzliche Anzahl an Berechnungen die durchgeführt werden soll, um zB die Genauigkeit zu erhöhen.
+Daher rechnen wir immer vom letzten geschriebenen Chechpoint I_c bis I_1 + I_2.
+
+4.3.
+Wir haben die atomaren Checkpoints folgendermaßen realisiert:
+Wir schreiben an zwei verschiedene positionen in die Datei:
+Einmal gnaz normal nach dem Header und einen zweiten Block nach dem ersten, so dass alle ungeraden Iterationen
+in den ersten Block und alle geraden Iterationen in den zweiten Block geschrieben werden. Über den Header kann dann geprüft werden, wo gelesen werden muss. Der Header wird erst aktualisiert, nachdem alle Daten geschrieben wurden.
+Diese Methode benötigt dadurch natürlich annähernd doppelten Speicherplatz, was bei PB zu Problemen führen könnte.
+Eine andere Möglichkeit wäre vielleicht den Speicher im gesamten in die Datei zu mappen, sobald geschrieben wurde?

@@ -15,7 +15,7 @@
 #include <sys/types.h>
 #include <string.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 #if DEBUG
 #define N 10
@@ -28,6 +28,9 @@ struct timeval start_time;       /* time when program started               */
 struct timeval comp_time;        /* time when calculation complet           */
 struct timeval start_time_iops;
 struct timeval end_time_iops;
+double g_time_iops;
+double g_bytes_written;
+double g_iops_calls;
 
 
 /* ************************************************************************ */
@@ -130,7 +133,7 @@ show_matrix(double** matrix)
 /* ************************************************************************* */
 static
 void
-read_matrix (double** matrix,char* filepath,int *t_1, int *i_1, int *i_c)
+read_matrix (double** matrix,char* filepath,int threads, int *iterations, int *t_1, int *i_1, int *i_c)
 {
 
     int fd, cl;
@@ -150,19 +153,29 @@ read_matrix (double** matrix,char* filepath,int *t_1, int *i_1, int *i_c)
 
     ping = (*i_c - 1) % 2;
     size = N*N*sizeof(double);
+    *iterations = *iterations + *i_1;
 
     //handle cases listed in exercise
 
     // t1 != t2, does this matter?
-
+    if (*t_1 != threads)
+    {
+        printf("Different Number of Threads: T_1: %d, T_2: %d\n", *t_1, threads);
+    }
     // i_c < i_1 : first run was interrupted somehow
-    //TODO, if atomic writing: do nothing, start from iteration i_c until i_2
-    // if no atomic writing: data may be corrupted
 
-    // i_c == i_1 & i_c > i_2: first run completed, and..? does this matter?
-
-
-    // i_c == i_1 & i_1 < i_2: first run completed, second run longer than first one? does this matter?
+    //we chose to read the parameters i_c, i_1, i_2 as following:
+    //if i_c < i_1, the first run was interrupted
+    //anyway, we start from the last checkpoint written +1 and calculate everything until i_1 + i_2
+    if(*i_c != *i_1)
+    {
+        printf("First Run was interrupted: Finished Iteration %d of %d\n", *i_c, *i_1);
+    }
+    else
+    {
+        printf("First run completed with %d iterations\n",*i_1);
+    }
+    printf("Running from iteration %d to %d\n",*i_c + 1, *iterations);
 
 
 #if DEBUG
@@ -232,7 +245,7 @@ calculate (double** matrix, int iterations, int threads,char *filepath,int *t_1,
 		from =  (tid < (N % threads)) ? (lines * tid) : ((lines * tid) + (N % threads));
 		to = from + lines;
 
-		for (k = 1; k <= iterations; k++)
+		for (k = *i_c + 1; k <= iterations; k++)
 		{
 #pragma omp single nowait
             {
@@ -282,6 +295,12 @@ calculate (double** matrix, int iterations, int threads,char *filepath,int *t_1,
             #pragma omp single
             {
                 gettimeofday(&end_time_iops, NULL);
+
+			    g_time_iops +=(end_time_iops.tv_sec - start_time_iops.tv_sec)
+                + (end_time_iops.tv_usec - start_time_iops.tv_usec)
+                  * 1e-6;
+			    g_bytes_written += N*N*sizeof(double);
+			    g_iops_calls += N;
                 //write last iteration
                 pwrite(fd,(void*)&k,sizeof(int),2*sizeof(int));
             }
@@ -303,16 +322,14 @@ calculate (double** matrix, int iterations, int threads,char *filepath,int *t_1,
 /* ************************************************************************ */
 static
 void
-displayStatistics (void)
+displayStatistics (int iterations)
 {
 	double time = (comp_time.tv_sec - start_time.tv_sec) + (comp_time.tv_usec - start_time.tv_usec) * 1e-6;
 
-	//TODO: I do not know, if this calculation is correct?
-	double time_iops =  (end_time_iops.tv_sec - start_time_iops.tv_sec)
-	                    + (end_time_iops.tv_usec - start_time_iops.tv_usec)
-	                    * 1e-6;
-	double iops_per_sec = N / time_iops;
-	double mb_per_sec = N*N*sizeof(double) * 1e-6 / time_iops;
+	double iops_per_sec = (g_iops_calls / g_time_iops) / (double)iterations;
+
+	double mb_per_sec = (g_bytes_written / g_time_iops) / (double)iterations * 1e-6;
+
 	printf("Berechnungszeit: %fs\n", time);
 
 	printf("Durchsatz:       %f MB/s\n", mb_per_sec);
@@ -352,6 +369,10 @@ main (int argc, char** argv)
 	int file_exists; //1 if exists, 0 otherwise
 	int t_1,i_1,i_c;
 
+	g_time_iops = 0.0;
+	g_bytes_written = 0.0;
+	g_iops_calls = 0.0;
+
 #if DEBUG
     printf("DEBUG RUN\n");
     printf("Matrix will only be %dx%d\n",N,N);
@@ -385,7 +406,7 @@ main (int argc, char** argv)
 	if (file_exists)
 	{
 	    printf("file does exist: %s\n",filepath);
-		read_matrix(matrix,filepath,&t_1,&i_1,&i_c);
+		read_matrix(matrix, filepath, threads, &iterations, &t_1, &i_1, &i_c);
 	}
 	else
 	{
@@ -410,7 +431,7 @@ main (int argc, char** argv)
 	show_matrix(matrix);
 #endif
 
-	displayStatistics();
+	displayStatistics(iterations);
 
 	free_matrix(matrix);
 
